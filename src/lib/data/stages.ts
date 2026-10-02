@@ -1,3 +1,11 @@
+import {
+	ingestionQuestions,
+	validationQuestions,
+	bronzeQuestions,
+	silverQuestions,
+	goldQuestions
+} from './questions.ts';
+
 export type StageStatus = 'keep' | 'rebuild' | 'new';
 
 export interface InterviewQuestion {
@@ -28,7 +36,7 @@ export const stages: Stage[] = [
 	{
 		id: 'sources',
 		label: 'Sources',
-		sub: 'Core banking · cards · app events',
+		sub: 'SQL Server · Kinesis events · S3 files',
 		status: 'keep',
 		problem:
 			'Data originates in many systems with different shapes, latencies and owners. Without a clear inventory you cannot reason about freshness, PII or blast radius.',
@@ -74,10 +82,7 @@ export const stages: Stage[] = [
 			'CDC LSN gaps after log truncation causing silent data loss',
 			'Kinesis shard hot-spotting on a skewed partition key'
 		],
-		questions: [
-			{ q: 'Why keep SSIS CDC rather than replacing it with DMS immediately?' },
-			{ q: 'How would you guarantee exactly-once semantics on a Kinesis stream?' }
-		],
+		questions: ingestionQuestions,
 		oneLiner: 'Keep the CDC that works, add streaming beside it — not instead of it.'
 	},
 	{
@@ -101,10 +106,7 @@ export const stages: Stage[] = [
 			'Tests that only check not-null and give false confidence',
 			'Alert fatigue — every check paging someone at 3am'
 		],
-		questions: [
-			{ q: 'How would you build a data quality strategy from scratch?' },
-			{ q: 'What do you do with records that fail validation?' }
-		],
+		questions: validationQuestions,
 		oneLiner: 'Quarantine, don’t delete — bad data is evidence.'
 	},
 	{
@@ -128,10 +130,7 @@ export const stages: Stage[] = [
 			'Transforming in Bronze — you lose the ability to replay',
 			'Unbounded retention creating GDPR right-to-erasure headaches'
 		],
-		questions: [
-			{ q: 'Why is the current medallion architecture "not fit for purpose"? How would you assess it?' },
-			{ q: 'How do you handle GDPR erasure in an immutable Bronze layer?' }
-		],
+		questions: bronzeQuestions,
 		oneLiner: 'Bronze is your time machine — never edit it.'
 	},
 	{
@@ -155,16 +154,13 @@ export const stages: Stage[] = [
 			'Business logic leaking into Silver instead of Gold',
 			'Late-arriving streaming events breaking incremental models'
 		],
-		questions: [
-			{ q: 'How would you merge batch CDC and streaming events into one Silver table?' },
-			{ q: 'Explain SCD Type 2 and when you would use it here.' }
-		],
+		questions: silverQuestions,
 		oneLiner: 'Silver answers "what is true?" — Gold answers "what does it mean?"'
 	},
 	{
 		id: 'gold',
 		label: 'Gold',
-		sub: 'Business-ready marts',
+		sub: 'Business-ready marts · staged & aggregated',
 		status: 'rebuild',
 		problem:
 			'Analysts and executives need performant, well-named datasets that map to business questions, not source tables.',
@@ -182,10 +178,7 @@ export const stages: Stage[] = [
 			'Mart sprawl — five definitions of "active customer"',
 			'Big-bang migration of every report at once'
 		],
-		questions: [
-			{ q: 'How would you prioritise which Gold marts to rebuild first?' },
-			{ q: 'How do you stop metric definitions drifting across teams?' }
-		],
+		questions: goldQuestions,
 		oneLiner: 'Gold is a product with customers — give it owners and SLAs.'
 	},
 	{
@@ -218,7 +211,7 @@ export const stages: Stage[] = [
 	{
 		id: 'apis',
 		label: 'Consumers',
-		sub: 'BI · APIs · ML · Claude',
+		sub: 'Power BI · self-serve AI (Claude via MCP)',
 		status: 'new',
 		problem:
 			'Data only creates value when it reaches decisions — dashboards, product features, models and AI assistants.',

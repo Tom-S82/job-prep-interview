@@ -89,4 +89,9 @@ Security, Governance, Metadata & Lineage, Testing, Monitoring, CI/CD, Infrastruc
 - **Version Control:** GitHub
 - **Deployment:** (TBD after interview—Vercel + Render plan)
 
+## File paths
+- **docs/architecture:** Instructions of tasks and source documentation. This should be read whenever relevant.
+- **docs/architecture/private_input:** Specific job descriptions and company profiles for the particular interview preparation. Success is when the project overfits to the requirements in these files.
+
+
 ## Code Structure (Emerging)
