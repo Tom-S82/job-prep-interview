@@ -1,4 +1,4 @@
-# Build Step 004: Architecture Challenge Mode
+# Build Step 005: Architecture Challenge Mode
 
 ## Scope
 Interactive scenario where user is presented with:

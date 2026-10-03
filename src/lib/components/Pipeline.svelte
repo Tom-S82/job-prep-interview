@@ -5,6 +5,8 @@
 	import { rtbfScenarios, type TraceTarget } from '#lib/data/rtbf-scenarios.ts';
 	import MetadataPanel from './governance/MetadataPanel.svelte';
 	import RtbfPanel from './governance/RtbfPanel.svelte';
+	import { markdownToHtml } from '#lib/utils/markdown.ts';
+	import { questionSets } from '#lib/data/questions.ts';
 
 	// --- Layout constants (SVG user units; the SVG scales via viewBox) ---
 	const W = 1200;
@@ -1130,6 +1132,12 @@
 			<div class="mt-5 border-t border-slate-800 pt-4">
 				<h4 class="mb-2 font-mono text-xs tracking-widest text-amber-400/80 uppercase">
 					Interview questions <span class="normal-case tracking-normal text-slate-500">— think first, then reveal</span>
+					{#if questionSets.some((s) => s.id === selected.id && s.questions.length)}
+						<a
+							href="/interview?set={selected.id}"
+							class="practise-link ml-2 normal-case tracking-normal text-sky-400 hover:text-sky-300">Practise in Interview Mode →</a
+						>
+					{/if}
 				</h4>
 				<ol class="space-y-2">
 					{#each selected.questions as item, qi (item.q)}
@@ -1142,9 +1150,11 @@
 										<span class="font-mono text-xs text-slate-500 group-open:hidden">reveal ▸</span>
 										<span class="hidden font-mono text-xs text-slate-500 group-open:inline">hide ▾</span>
 									</summary>
-									<p class="answer border-t border-slate-800 px-3 py-3 leading-relaxed whitespace-pre-line text-slate-300">
-										{item.a}
-									</p>
+									<div
+										class="answer prose prose-sm prose-invert max-w-none border-t border-slate-800 px-3 py-3 prose-p:text-slate-300 prose-strong:text-amber-200 prose-li:text-slate-300"
+									>
+										{@html markdownToHtml(item.a)}
+									</div>
 								</details>
 							{:else}
 								<div class="px-3 py-2">
