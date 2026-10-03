@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import * as d3 from 'd3';
-	import { stages, statusMeta, type Stage } from '#lib/data/stages.ts';
+	import { stages, statusMeta, lenses, type Stage, type LensId } from '#lib/data/stages.ts';
+	import { rtbfScenarios, type TraceTarget } from '#lib/data/rtbf-scenarios.ts';
+	import MetadataPanel from './governance/MetadataPanel.svelte';
+	import RtbfPanel from './governance/RtbfPanel.svelte';
 
 	// --- Layout constants (SVG user units; the SVG scales via viewBox) ---
 	const W = 1200;
@@ -55,9 +58,37 @@
 
 	const selected = $derived<Stage | null>(selectedIndex === null ? null : stages[selectedIndex]);
 
+	// --- Governance state ---
+	let activeLens = $state<LensId | null>(null);
+	let metaStageId = $state<string | null>(null);
+	let rtbfScenarioId = $state<string | null>(null);
+	let rtbfStep = $state(0);
+	let rtbfPlaying = $state(false);
+
+	const lens = $derived(lenses.find((l) => l.id === activeLens) ?? null);
+	const rtbfScenario = $derived(rtbfScenarios.find((s) => s.id === rtbfScenarioId) ?? null);
+
 	function toggle(i: number) {
 		selectedIndex = selectedIndex === i ? null : i;
 	}
+
+	function startRtbf(id: string) {
+		rtbfScenarioId = id;
+		rtbfStep = 0;
+		rtbfPlaying = true;
+	}
+
+	// Auto-advance the RTBF trace while playing
+	$effect(() => {
+		if (!rtbfPlaying || !rtbfScenario) return;
+		const last = rtbfScenario.steps.length - 1;
+		if (rtbfStep >= last) {
+			rtbfPlaying = false;
+			return;
+		}
+		const t = setTimeout(() => (rtbfStep = Math.min(last, rtbfStep + 1)), 1800);
+		return () => clearTimeout(t);
+	});
 
 	function targetWidths(sel: number | null): number[] {
 		const weights = stages.map((_, i) => (i === sel ? EXPAND_WEIGHT : 1));
@@ -379,6 +410,103 @@
 			.attr('stroke', '#475569')
 			.attr('stroke-width', 2);
 
+		// --- Cold storage: Glacier vault fed by Bronze + Gold lifecycle rules ---
+		const BRONZE = 3;
+		const GLACIER_Y = 262;
+		const glacier = svg.append('g').attr('class', 'glacier');
+		const glacierLinks = glacier
+			.selectAll('path')
+			.data([BRONZE, GOLD])
+			.join('path')
+			.attr('fill', 'none')
+			.attr('stroke', '#60a5fa')
+			.attr('stroke-width', 1.2)
+			.attr('stroke-dasharray', '3 4');
+		const glacierRect = glacier
+			.append('rect')
+			.attr('y', GLACIER_Y)
+			.attr('height', 30)
+			.attr('rx', 5)
+			.attr('fill', '#0c1a2e')
+			.attr('stroke', '#1e3a5f');
+		const glacierText = glacier
+			.append('text')
+			.attr('y', GLACIER_Y + 13)
+			.attr('text-anchor', 'middle')
+			.attr('fill', '#93c5fd')
+			.attr('font-size', 9.5)
+			.attr('font-family', 'ui-monospace, monospace')
+			.attr('letter-spacing', 0.5)
+			.text('❄ S3 GLACIER DEEP ARCHIVE');
+		const glacierSub = glacier
+			.append('text')
+			.attr('y', GLACIER_Y + 24)
+			.attr('text-anchor', 'middle')
+			.attr('fill', '#64748b')
+			.attr('font-size', 8.5)
+			.attr('font-family', 'ui-monospace, monospace')
+			.text('Bronze @ 1y · Gold reg. snapshots @ 1y · expire 6–7y');
+
+		// --- Governance lens chips (above each machine) ---
+		const lensChips = svg
+			.append('g')
+			.attr('class', 'lens-chips')
+			.style('pointer-events', 'none')
+			.selectAll<SVGGElement, Stage>('g')
+			.data(stages)
+			.join('g')
+			.attr('class', 'lens-chip');
+		const lensChipRect = lensChips.append('rect').attr('y', 6).attr('height', 42).attr('rx', 5).attr('fill', '#0b1220');
+		const lensChipTag = lensChips
+			.append('text')
+			.attr('x', 7)
+			.attr('y', 22)
+			.attr('font-size', 10)
+			.attr('font-weight', 600);
+		const lensChipFlags = lensChips
+			.append('text')
+			.attr('x', 7)
+			.attr('y', 38)
+			.attr('font-size', 8.5)
+			.attr('font-family', 'ui-monospace, monospace');
+		const flagSpan = (on: boolean, txt: string) =>
+			`<tspan fill="${on ? '#e2e8f0' : '#334155'}">${on ? '●' : '○'} ${txt}</tspan>`;
+
+		// --- Metadata "{ }" icon per machine (click → JSON example) ---
+		const metaIcon = stageG
+			.append('g')
+			.attr('class', 'meta-icon')
+			.attr('role', 'button')
+			.attr('tabindex', 0)
+			.attr('aria-label', (d) => `Show example metadata for ${d.label}`)
+			.on('click', (e: MouseEvent, d) => {
+				e.stopPropagation();
+				metaStageId = metaStageId === d.id ? null : d.id;
+			})
+			.on('keydown', (e: KeyboardEvent, d) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					e.stopPropagation();
+					metaStageId = metaStageId === d.id ? null : d.id;
+				}
+			});
+		const metaIconRect = metaIcon
+			.append('rect')
+			.attr('x', 8)
+			.attr('y', BOX_BOTTOM - 22)
+			.attr('width', 24)
+			.attr('height', 15)
+			.attr('rx', 3)
+			.attr('fill', '#0b1220');
+		const metaIconText = metaIcon
+			.append('text')
+			.attr('x', 20)
+			.attr('y', BOX_BOTTOM - 11.5)
+			.attr('text-anchor', 'middle')
+			.attr('font-size', 9)
+			.attr('font-family', 'ui-monospace, monospace')
+			.text('{ }');
+
 		// One layer per shape, keyed joins — prevents elements being reused for the wrong particle
 		const pLayer = svg.append('g').attr('filter', 'url(#pglow)').style('pointer-events', 'none');
 		const layer = {
@@ -387,6 +515,27 @@
 			stream: pLayer.append('g'),
 			agg: pLayer.append('g')
 		};
+
+		// --- RTBF trace: request pulse travelling backwards Consumers → Sources ---
+		const rtbfG = svg.append('g').attr('class', 'rtbf').style('pointer-events', 'none');
+		const rtbfTrail = rtbfG
+			.append('path')
+			.attr('fill', 'none')
+			.attr('stroke', '#e879f9')
+			.attr('stroke-width', 2)
+			.attr('stroke-dasharray', '5 4');
+		const rtbfPulse = rtbfG.append('circle').attr('r', 9).attr('fill', 'none').attr('stroke', '#e879f9').attr('stroke-width', 2);
+		const rtbfCore = rtbfG.append('circle').attr('r', 4).attr('fill', '#f0abfc');
+		const rtbfLabel = rtbfG
+			.append('text')
+			.attr('text-anchor', 'middle')
+			.attr('fill', '#f0abfc')
+			.attr('font-size', 9.5)
+			.attr('font-family', 'ui-monospace, monospace');
+		let rtbfX = 0;
+		let rtbfY = 0;
+		let rtbfWasActive = false;
+		const targetIndex = (t: TraceTarget) => stages.findIndex((s) => s.id === t);
 
 		// --- Simulation state ---
 		let nextId = 0;
@@ -398,6 +547,9 @@
 		let lastRelease = -999;
 		let elapsed = 0;
 		let last = 0;
+		let dimLevel = 1;
+		let lensFade = 0;
+		let lastLensId: LensId | null = null;
 		let streamAcc = 0;
 		let sqlAcc = 120;
 		let fileAcc = 60;
@@ -599,7 +751,20 @@
 
 			// --- Render stages ---
 			stageG.attr('transform', (_d, i) => `translate(${xs[i]},0)`);
-			body.attr('width', (_d, i) => widths[i]).attr('stroke', (_d, i) => (i === selectedIndex ? stageColors[i] : '#273449'));
+			// Governance state for this frame
+			const lensNow = activeLens ? lenses.find((l) => l.id === activeLens)! : null;
+			const scen = rtbfScenarioId ? rtbfScenarios.find((s) => s.id === rtbfScenarioId)! : null;
+			const visited = scen ? scen.steps.slice(0, rtbfStep + 1).map((s) => s.target) : [];
+			const current = visited[visited.length - 1];
+
+			body
+				.attr('width', (_d, i) => widths[i])
+				.attr('stroke', (d, i) => {
+					if (scen && visited.includes(d.id as TraceTarget)) return '#e879f9';
+					if (lensNow) return lensNow.legend[d.governance[lensNow.id].level].color;
+					return i === selectedIndex ? stageColors[i] : '#273449';
+				})
+				.attr('stroke-width', (d) => (scen && current === d.id ? 3 : 1.5));
 			windowRect.attr('x', 8).attr('width', (d) => Math.max(0, widths[stages.indexOf(d)] - 16));
 			statusPip.attr('cx', 14);
 			label.attr('x', 24);
@@ -637,6 +802,66 @@
 			returnLabel
 				.attr('x', (vCentre + srcCentre) / 2)
 				.text(`fix at source → replay   ·   ${stats.quarantined} held · ${stats.replayed} replayed`);
+
+			// --- Governance overlays ---
+			dimLevel += ((lensNow || scen ? 0.2 : 1) - dimLevel) * Math.min(1, 0.12 * dtRaw);
+			pLayer.attr('opacity', dimLevel);
+			belt.attr('opacity', 0.4 + 0.6 * dimLevel);
+
+			lensFade += ((lensNow ? 1 : 0) - lensFade) * Math.min(1, 0.15 * dtRaw);
+			lensChips.attr('transform', (_d, i) => `translate(${xs[i]},0)`).attr('opacity', lensFade);
+			lensChipRect
+				.attr('width', (_d, i) => widths[i])
+				.attr('stroke', (d) => (lensNow ? lensNow.legend[d.governance[lensNow.id].level].color : '#334155'));
+			if (lensNow && lensNow.id !== lastLensId) {
+				lastLensId = lensNow.id;
+				lensChipTag.attr('fill', (d) => lensNow.legend[d.governance[lensNow.id].level].color).text((d) => d.governance[lensNow.id].tag);
+				lensChipFlags.html(
+					(d) =>
+						`${flagSpan(d.governance.handlesPII, 'PII')} ${flagSpan(d.governance.retention !== null, 'RET')} ${flagSpan(
+							d.governance.handlesPII || d.id === 'apis',
+							'RTBF'
+						)}`
+				);
+			}
+
+			const gx0 = xs[BRONZE] + 8;
+			const gx1 = xs[GOLD] + widths[GOLD] - 8;
+			const glacierHot = activeLens === 'lifecycle' || current === 'glacier';
+			glacier.attr('opacity', glacierHot ? 1 : 0.45);
+			glacierRect.attr('x', gx0).attr('width', Math.max(0, gx1 - gx0)).attr('stroke', current === 'glacier' ? '#e879f9' : '#1e3a5f');
+			glacierText.attr('x', (gx0 + gx1) / 2);
+			glacierSub.attr('x', (gx0 + gx1) / 2);
+			glacierLinks
+				.attr('d', (i) => `M${centre(i)},${BOX_BOTTOM} V${GLACIER_Y}`)
+				.attr('stroke-dashoffset', -elapsed * 0.4);
+
+			metaIconRect.attr('stroke', (d) => (metaStageId === d.id ? '#38bdf8' : '#334155'));
+			metaIconText.attr('fill', (d) => (metaStageId === d.id ? '#7dd3fc' : '#64748b'));
+
+			// RTBF pulse
+			rtbfG.attr('opacity', scen ? 1 : 0);
+			if (scen && current) {
+				const posOf = (tgt: TraceTarget): [number, number] =>
+					tgt === 'glacier' ? [(gx0 + gx1) / 2, GLACIER_Y + 15] : [centre(targetIndex(tgt)), BELT_Y];
+				const [tx, ty] = posOf(current);
+				if (!rtbfWasActive) [rtbfX, rtbfY] = posOf('apis');
+				rtbfWasActive = true;
+				rtbfX += (tx - rtbfX) * Math.min(1, 0.08 * dtRaw);
+				rtbfY += (ty - rtbfY) * Math.min(1, 0.08 * dtRaw);
+				const pts = visited.slice(0, -1).map(posOf);
+				pts.push([rtbfX, rtbfY]);
+				rtbfTrail.attr('d', d3.line()(pts) ?? '').attr('stroke-dashoffset', elapsed * 0.6);
+				rtbfPulse
+					.attr('cx', rtbfX)
+					.attr('cy', rtbfY)
+					.attr('r', 8 + ((elapsed * 0.3) % 10))
+					.attr('opacity', 1 - ((elapsed * 0.3) % 10) / 10);
+				rtbfCore.attr('cx', rtbfX).attr('cy', rtbfY);
+				rtbfLabel.attr('x', rtbfX).attr('y', rtbfY - 18).text(`RTBF ${scen.customer.replace('Customer ', '')}`);
+			} else {
+				rtbfWasActive = false;
+			}
 
 			// --- Render particles (keyed by id) ---
 			const byKind = (k: Kind) => particles.filter((p) => p.kind === k);
@@ -735,6 +960,43 @@
 		</div>
 	</header>
 
+	<div class="mb-3 flex flex-wrap items-center gap-2" role="toolbar" aria-label="Governance overlays">
+		<span class="mr-1 font-mono text-[11px] tracking-widest text-slate-500 uppercase">Governance</span>
+		{#each lenses as l (l.id)}
+			<button
+				type="button"
+				class="lens-toggle rounded-full border px-3 py-1 text-xs transition-colors"
+				class:border-sky-500={activeLens === l.id}
+				class:bg-sky-500={activeLens === l.id}
+				class:text-slate-950={activeLens === l.id}
+				class:border-slate-700={activeLens !== l.id}
+				class:text-slate-300={activeLens !== l.id}
+				aria-pressed={activeLens === l.id}
+				onclick={() => (activeLens = activeLens === l.id ? null : l.id)}
+			>
+				{l.label}
+			</button>
+		{/each}
+		<span class="mx-1 hidden h-5 w-px bg-slate-800 sm:block"></span>
+		<label class="flex items-center gap-2 text-xs text-slate-400">
+			<span class="font-mono tracking-widest text-fuchsia-400/80 uppercase">RTBF request</span>
+			<select
+				class="rtbf-select rounded-md border-slate-700 bg-slate-900 py-1 pr-8 pl-2 text-xs text-slate-200"
+				value={rtbfScenarioId ?? ''}
+				onchange={(e) => {
+					const v = e.currentTarget.value;
+					if (v) startRtbf(v);
+					else rtbfScenarioId = null;
+				}}
+			>
+				<option value="">— choose a scenario —</option>
+				{#each rtbfScenarios as s (s.id)}
+					<option value={s.id}>{s.customer} · {s.label}</option>
+				{/each}
+			</select>
+		</label>
+	</div>
+
 	<div class="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
 		<svg
 			bind:this={svgEl}
@@ -752,7 +1014,46 @@
 		<li><span class="text-amber-400">▪▪</span> Gold aggregate</li>
 		<li><span class="text-red-400">●</span> quarantined</li>
 		<li><span class="text-green-400">○</span> corrected &amp; replayed</li>
+		<li><span class="text-sky-400">{'{ }'}</span> click for example metadata</li>
 	</ul>
+
+	{#if lens}
+		<div class="lens-legend mt-3 rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-3">
+			<p class="text-sm text-slate-200"><span class="font-semibold">{lens.label} lens:</span> {lens.question}</p>
+			<div class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+				{#each Object.entries(lens.legend) as [lvl, m] (lvl)}
+					<span class="flex items-center gap-1.5 text-slate-400"
+						><span class="h-2.5 w-2.5 rounded-sm border" style="border-color:{m.color}"></span>{m.label}</span
+					>
+				{/each}
+				<span class="font-mono text-slate-500">● PII handled · ● RET retention policy · ● RTBF erasure applies</span>
+			</div>
+		</div>
+	{/if}
+
+	{#if metaStageId}
+		<MetadataPanel stageId={metaStageId} onclose={() => (metaStageId = null)} />
+	{/if}
+
+	{#if rtbfScenario}
+		<RtbfPanel
+			scenario={rtbfScenario}
+			step={rtbfStep}
+			playing={rtbfPlaying}
+			onstep={(i) => {
+				rtbfPlaying = false;
+				rtbfStep = Math.max(0, Math.min(rtbfScenario.steps.length - 1, i));
+			}}
+			ontoggleplay={() => {
+				if (!rtbfPlaying && rtbfStep >= rtbfScenario.steps.length - 1) rtbfStep = 0;
+				rtbfPlaying = !rtbfPlaying;
+			}}
+			onclose={() => {
+				rtbfScenarioId = null;
+				rtbfPlaying = false;
+			}}
+		/>
+	{/if}
 
 	{#if selected && selectedIndex !== null}
 		{@const color = stageColors[selectedIndex]}
@@ -802,6 +1103,28 @@
 						{#each selected.pitfalls as s (s)}<li>{s}</li>{/each}
 					</ul>
 				</div>
+			</div>
+
+			<div class="governance mt-5 border-t border-slate-800 pt-4">
+				<h4 class="mb-2 font-mono text-xs tracking-widest text-fuchsia-400/80 uppercase">Governance</h4>
+				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+					{#each lenses as l (l.id)}
+						{@const g = selected.governance[l.id]}
+						<div class="rounded-lg border bg-slate-950/50 p-3" style="border-color:{l.legend[g.level].color}55">
+							<p class="font-mono text-[10px] tracking-widest text-slate-500 uppercase">{l.label}</p>
+							<p class="text-sm font-semibold" style="color:{l.legend[g.level].color}">{g.tag}</p>
+							<p class="mt-1 text-xs leading-relaxed text-slate-400">{g.detail}</p>
+						</div>
+					{/each}
+				</div>
+				<dl class="mt-3 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
+					<dt class="text-slate-500">Handles PII</dt>
+					<dd class="text-slate-300">{selected.governance.handlesPII ? 'Yes' : 'No'}</dd>
+					<dt class="text-slate-500">Retention</dt>
+					<dd class="text-slate-300">{selected.governance.retention ?? 'Not stored'}</dd>
+					<dt class="text-slate-500">On erasure request</dt>
+					<dd class="text-slate-300">{selected.governance.erasure}</dd>
+				</dl>
 			</div>
 
 			<div class="mt-5 border-t border-slate-800 pt-4">

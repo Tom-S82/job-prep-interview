@@ -55,3 +55,40 @@ test('click expands and collapses a stage; answers reveal', async ({ page }) => 
 	await ingestion.click();
 	await expect(page.locator('article')).toHaveCount(0);
 });
+
+test('governance lens toggles overlay on and off', async ({ page }) => {
+	await page.goto('/');
+	const security = page.getByRole('button', { name: 'Security' });
+	await security.click();
+	await expect(security).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.locator('.lens-legend')).toContainText('Security lens');
+	await expect(page.locator('.lens-chip text', { hasText: 'Raw · engineers only' })).toBeAttached();
+	await page.getByRole('button', { name: 'Lifecycle' }).click();
+	await expect(page.locator('.lens-chip text', { hasText: 'Std → IA → Glacier' })).toBeAttached();
+	await page.getByRole('button', { name: 'Lifecycle' }).click();
+	await expect(page.locator('.lens-legend')).toHaveCount(0);
+});
+
+test('metadata icon reveals JSON without toggling the stage', async ({ page }) => {
+	await page.goto('/');
+	await page.locator('g.stage[data-stage="gold"] .meta-icon').click();
+	await expect(page.locator('.metadata-json')).toContainText('s3://tm-platform-gold/');
+	await expect(page.locator('.metadata-json')).toContainText('contains_pii');
+	await expect(page.locator('article')).toHaveCount(0);
+});
+
+test('RTBF scenario can be selected and traced', async ({ page }) => {
+	await page.goto('/');
+	await page.locator('.rtbf-select').selectOption('closed-hold');
+	const panel = page.locator('.rtbf-panel');
+	await expect(panel).toContainText('Customer #1177');
+	await panel.getByRole('button', { name: /Pause/ }).click();
+	for (let i = 0; i < 10; i++) {
+		const next = panel.getByRole('button', { name: 'Next ▸' });
+		if (await next.isDisabled()) break;
+		await next.click();
+	}
+	await expect(panel).toContainText('Cold storage: Glacier');
+	await expect(panel).toContainText('Retain (legal hold)');
+	await expect(panel).toContainText('Outcome:');
+});

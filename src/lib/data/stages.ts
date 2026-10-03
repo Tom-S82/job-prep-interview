@@ -24,6 +24,7 @@ export interface Stage {
 	pitfalls: string[];
 	questions: InterviewQuestion[];
 	oneLiner: string;
+	governance: Governance;
 }
 
 export const statusMeta: Record<StageStatus, { label: string; color: string }> = {
@@ -32,7 +33,7 @@ export const statusMeta: Record<StageStatus, { label: string; color: string }> =
 	new: { label: 'New build', color: '#38bdf8' }
 };
 
-export const stages: Stage[] = [
+const baseStages: Omit<Stage, 'governance'>[] = [
 	{
 		id: 'sources',
 		label: 'Sources',
@@ -236,3 +237,298 @@ export const stages: Stage[] = [
 		oneLiner: 'If no one consumes it, it isn’t a data product — it’s a cost.'
 	}
 ];
+
+// --- Governance (cross-cutting lenses) ---
+
+export type LensId = 'security' | 'lifecycle' | 'lineage' | 'compliance';
+export type Level = 'high' | 'medium' | 'low' | 'none';
+
+export interface LensInfo {
+	level: Level;
+	tag: string; // short label shown on the diagram
+	detail: string;
+}
+
+export interface Governance {
+	security: LensInfo;
+	lifecycle: LensInfo;
+	lineage: LensInfo;
+	compliance: LensInfo;
+	handlesPII: boolean;
+	retention: string | null;
+	erasure: string; // how a right-to-erasure request is applied at this stage
+}
+
+export const lenses: {
+	id: LensId;
+	label: string;
+	question: string;
+	legend: Record<Level, { label: string; color: string }>;
+}[] = [
+	{
+		id: 'security',
+		label: 'Security',
+		question: 'How sensitive is the data here, and who can see it?',
+		legend: {
+			high: { label: 'Raw PII / PCI', color: '#f87171' },
+			medium: { label: 'PII tagged & masked', color: '#fbbf24' },
+			low: { label: 'Pseudonymised / governed', color: '#34d399' },
+			none: { label: 'No customer data', color: '#64748b' }
+		}
+	},
+	{
+		id: 'lifecycle',
+		label: 'Lifecycle',
+		question: 'How long is it kept, where does it go cold, and when is it deleted?',
+		legend: {
+			high: { label: 'Long-term + archive tiers', color: '#60a5fa' },
+			medium: { label: 'Retained with expiry', color: '#a78bfa' },
+			low: { label: 'Short-lived / cache', color: '#94a3b8' },
+			none: { label: 'Not stored', color: '#475569' }
+		}
+	},
+	{
+		id: 'lineage',
+		label: 'Lineage',
+		question: 'Can we trace any value here back to its source record?',
+		legend: {
+			high: { label: 'Row/column-level lineage', color: '#34d399' },
+			medium: { label: 'Dataset-level lineage', color: '#fbbf24' },
+			low: { label: 'Catalogue entry only', color: '#f87171' },
+			none: { label: 'Untracked', color: '#475569' }
+		}
+	},
+	{
+		id: 'compliance',
+		label: 'Compliance',
+		question: 'Which obligations bite here: GDPR, PCI-DSS, FCA, audit?',
+		legend: {
+			high: { label: 'Primary control point', color: '#f472b6' },
+			medium: { label: 'Supporting control', color: '#a78bfa' },
+			low: { label: 'Inherits controls', color: '#64748b' },
+			none: { label: 'Out of scope', color: '#475569' }
+		}
+	}
+];
+
+const governance: Record<string, Governance> = {
+	sources: {
+		security: {
+			level: 'high',
+			tag: 'Full PII · PAN',
+			detail:
+				'SQL Server holds names, addresses, DOB and contact details. Card PANs stay with the card processor inside the PCI zone and are never extracted.'
+		},
+		lifecycle: {
+			level: 'medium',
+			tag: 'System of record',
+			detail:
+				'Retention is owned by the source application. Financial and KYC records are kept 5 years after the relationship ends (MLR 2017).'
+		},
+		lineage: {
+			level: 'low',
+			tag: 'Catalogue + owner',
+			detail:
+				'Each source table is catalogued with an owner, a data contract and a PII classification. This is where lineage starts.'
+		},
+		compliance: {
+			level: 'high',
+			tag: 'GDPR · PCI scope',
+			detail:
+				'Erasure in the system of record is an operational process. The data platform must mirror it, not replace it.'
+		},
+		handlesPII: true,
+		retention: 'Owned by source system (MLR: 5y after relationship end)',
+		erasure: 'Ops process in the system of record; emits an erasure event the platform subscribes to'
+	},
+	ingestion: {
+		security: {
+			level: 'high',
+			tag: 'TLS · KMS · tokenise',
+			detail:
+				'PAN-like fields are tokenised before entering Kinesis. Streams are KMS-encrypted, and producers and consumers have separate IAM roles.'
+		},
+		lifecycle: {
+			level: 'low',
+			tag: 'Stream TTL 24h–7d',
+			detail: 'Kinesis retention is short by design. Firehose lands everything in S3 Bronze, which is the durable copy.'
+		},
+		lineage: {
+			level: 'high',
+			tag: 'LSN · seq · load_id',
+			detail:
+				'Every record gets its CDC LSN or Kinesis sequence number and a load_id linking it back to the orchestration run.'
+		},
+		compliance: {
+			level: 'high',
+			tag: 'PCI boundary',
+			detail: 'Tokenising at ingestion keeps the whole analytics platform out of PCI-DSS cardholder-data scope.'
+		},
+		handlesPII: true,
+		retention: 'Kinesis 24h (max 7d); SSIS staging truncated per run',
+		erasure: 'Expires naturally; no action needed beyond the stream TTL'
+	},
+	validation: {
+		security: {
+			level: 'high',
+			tag: 'PII in quarantine',
+			detail: 'Quarantined payloads are raw and can contain PII, so the DLQ gets the same access controls as Bronze.'
+		},
+		lifecycle: {
+			level: 'medium',
+			tag: 'DLQ 30d',
+			detail: 'Quarantined records are replayed or purged within 30 days. Nothing is kept "just in case".'
+		},
+		lineage: {
+			level: 'high',
+			tag: 'Rule id · load_id',
+			detail: 'Each reject records the rule that failed, the load_id and the source key, so it can be traced and replayed.'
+		},
+		compliance: {
+			level: 'medium',
+			tag: 'Audit trail',
+			detail: 'The quarantine log is evidence of data-quality controls for audit and the FCA.'
+		},
+		handlesPII: true,
+		retention: '30 days',
+		erasure: 'Purge matching records from the DLQ / quarantine table'
+	},
+	bronze: {
+		security: {
+			level: 'high',
+			tag: 'Raw · engineers only',
+			detail:
+				'Raw, append-only data. Lake Formation limits access to the platform team, with a KMS key per domain. Direct identifiers are split into an identity vault.'
+		},
+		lifecycle: {
+			level: 'high',
+			tag: 'Std → IA → Glacier',
+			detail:
+				'S3 Standard for 90 days, Infrequent Access until 1 year, then Glacier Deep Archive. Expired 6 years after the relationship ends.'
+		},
+		lineage: {
+			level: 'high',
+			tag: 'Row-level envelope',
+			detail:
+				'Every row carries its source, LSN or event id, operation type, event and ingest times, load_id, schema version and a payload hash.'
+		},
+		compliance: {
+			level: 'high',
+			tag: 'Art.17 vs MLR',
+			detail:
+				'Erasure is in tension with immutability and legal retention. It is handled with Iceberg row deletes for hot data and crypto-shredding of identity-vault keys for archives.'
+		},
+		handlesPII: true,
+		retention: '6 years after relationship end; archive tiers after 90d / 1y',
+		erasure: 'Iceberg row delete (hot) · crypto-shred identity key (archived) · legal hold if MLR applies'
+	},
+	silver: {
+		security: {
+			level: 'medium',
+			tag: 'Tagged + masked',
+			detail:
+				'PII columns are tagged in the catalogue and masked by default. Only roles with a recorded justification can unmask.'
+		},
+		lifecycle: {
+			level: 'medium',
+			tag: 'SCD2 · 6y',
+			detail: 'Change history is kept for 6 years. Rebuildable from Bronze, so it does not need archiving.'
+		},
+		lineage: {
+			level: 'high',
+			tag: 'Column-level (dbt)',
+			detail: 'The dbt graph gives column-level lineage from each Silver column back to its Bronze fields.'
+		},
+		compliance: {
+			level: 'high',
+			tag: 'Consent applied',
+			detail: 'Consent and erasure flags are applied here, so everything downstream inherits them.'
+		},
+		handlesPII: true,
+		retention: '6 years (rebuildable from Bronze)',
+		erasure: 'Delete or pseudonymise rows for the subject, then rebuild affected incremental models'
+	},
+	gold: {
+		security: {
+			level: 'low',
+			tag: 'Pseudonymised',
+			detail: 'Marts use a surrogate customer_key. Direct identifiers exist only in a restricted CRM mart.'
+		},
+		lifecycle: {
+			level: 'medium',
+			tag: 'Snapshots → Glacier',
+			detail:
+				'Regulatory snapshots move to Glacier after 1 year and are kept 7 years. Other marts are rebuilt rather than archived.'
+		},
+		lineage: {
+			level: 'high',
+			tag: 'dbt exposures',
+			detail: 'Exposures link each mart to the Power BI reports and MCP tools that depend on it.'
+		},
+		compliance: {
+			level: 'medium',
+			tag: 'FCA · Consumer Duty',
+			detail:
+				'Regulatory datasets are signed off. Historic submitted snapshots are frozen: if a subject is erased, they are pseudonymised, never altered.'
+		},
+		handlesPII: true,
+		retention: '7 years for regulatory snapshots; others rebuilt',
+		erasure: 'Rebuild from Silver; frozen regulatory snapshots keep only the surrogate key'
+	},
+	semantic: {
+		security: {
+			level: 'low',
+			tag: 'RLS · no raw PII',
+			detail:
+				'Exposes metrics and dimensions, not rows. Row-level security is applied per role. MCP tools cannot select PII columns.'
+		},
+		lifecycle: {
+			level: 'none',
+			tag: 'Definitions only',
+			detail: 'Stores metric definitions, not data, apart from short-lived query caches.'
+		},
+		lineage: {
+			level: 'high',
+			tag: 'Metric → model',
+			detail: 'Every metric resolves to the dbt models and columns it is built from.'
+		},
+		compliance: {
+			level: 'medium',
+			tag: 'AI access policy',
+			detail:
+				'Decides what Claude is allowed to ask. Aggregates only, with minimum group sizes to prevent re-identification.'
+		},
+		handlesPII: false,
+		retention: null,
+		erasure: 'Nothing stored, so changes upstream flow through automatically; caches are invalidated'
+	},
+	apis: {
+		security: {
+			level: 'low',
+			tag: 'Role-based · audited',
+			detail: 'Power BI uses RLS. Every MCP tool call is logged with the user, the prompt context and the query.'
+		},
+		lifecycle: {
+			level: 'low',
+			tag: 'Cache · logs 1y',
+			detail:
+				'Power BI dataset caches refresh daily. MCP audit logs are kept 1 year with personal identifiers redacted.'
+		},
+		lineage: {
+			level: 'medium',
+			tag: 'Usage tracked',
+			detail: 'Usage stats and exposures show who consumes what, which also tells us what can be retired.'
+		},
+		compliance: {
+			level: 'high',
+			tag: 'Audit every AI query',
+			detail:
+				'Audit logs of AI access are a control in their own right. Personal data in prompts or responses is redacted in the logs.'
+		},
+		handlesPII: false,
+		retention: 'BI cache 24h · MCP audit logs 1 year',
+		erasure: 'Refresh BI datasets; redact the subject from MCP logs and cached exports'
+	}
+};
+
+export const stages: Stage[] = baseStages.map((s) => ({ ...s, governance: governance[s.id] }));
