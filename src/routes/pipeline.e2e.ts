@@ -49,7 +49,7 @@ test('click expands and collapses a stage; answers reveal', async ({ page }) => 
 	const ingestion = page.locator('g.stage[data-stage="ingestion"]');
 	await ingestion.click();
 	await expect(page.locator('article h3')).toHaveText('Ingestion');
-	await expect(page.locator('article details')).toHaveCount(6);
+	await expect(page.locator('article details')).toHaveCount(7);
 	await page.locator('article summary').first().click();
 	await expect(page.locator('article .answer').first()).toContainText('SSIS');
 	await ingestion.click();
@@ -58,6 +58,7 @@ test('click expands and collapses a stage; answers reveal', async ({ page }) => 
 
 test('governance lens toggles overlay on and off', async ({ page }) => {
 	await page.goto('/');
+	await expect(page.locator('g.stage')).toHaveCount(8); // hydrated: D3 draws stages in onMount
 	const security = page.getByRole('button', { name: 'Security' });
 	await security.click();
 	await expect(security).toHaveAttribute('aria-pressed', 'true');
@@ -79,6 +80,7 @@ test('metadata icon reveals JSON without toggling the stage', async ({ page }) =
 
 test('RTBF scenario can be selected and traced', async ({ page }) => {
 	await page.goto('/');
+	await expect(page.locator('g.stage')).toHaveCount(8); // hydrated: D3 draws stages in onMount
 	await page.locator('.rtbf-select').selectOption('closed-hold');
 	const panel = page.locator('.rtbf-panel');
 	await expect(panel).toContainText('Customer #1177');

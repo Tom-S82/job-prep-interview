@@ -1,5 +1,5 @@
 // Tiny markdown → HTML for interview answers.
-// Supports only what the answers use: paragraphs (blank line), **bold**,
+// Supports only what the answers use: paragraphs (blank line), **bold**, `code`,
 // "- " bullet lists and "1. " numbered lists. Input is HTML-escaped first,
 // so the output is safe to render with {@html}.
 
@@ -8,7 +8,7 @@ function escapeHtml(s: string): string {
 }
 
 function inline(s: string): string {
-	return s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+	return s.replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 }
 
 const BULLET = /^\s*[-*]\s+(.*)$/;

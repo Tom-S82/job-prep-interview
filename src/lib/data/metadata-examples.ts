@@ -43,18 +43,26 @@ export const metadataExamples: Record<string, MetadataExample> = {
 		}
 	},
 	validation: {
-		title: 'Quarantine record',
+		title: 'Quarantine record (Iceberg quarantine table)',
 		json: {
 			quarantine_id: 'q_8f3a91',
+			table: 'quarantine.core_banking (iceberg)',
 			load_id: LOAD_ID,
+			source: 'sqlserver.core_banking.dbo.customer_transactions',
 			source_key: { txn_id: 99120488 },
-			failed_rule: 'amount_within_product_limits',
-			severity: 'error',
-			payload_ref: 's3://tm-platform-quarantine/core_banking/2026-10-03/q_8f3a91.json',
+			original_payload: { txn_id: 99120488, amount: 125000.0, currency: 'GBP', product: 'basic_current' },
+			failed_rule: { id: 'amount_within_product_limits', owner: 'core-banking-team', severity: 'error' },
+			first_seen: '2026-10-03T15:42:29Z',
+			triage: {
+				status: 'triaged',
+				lifecycle: 'new → triaged → fixed_at_source → replayed | discarded',
+				assignee: 'core-banking-team',
+				sla_due: '2026-10-06T17:00:00Z',
+				root_cause: 'Decimal shift in upstream export (pence sent as pounds)'
+			},
 			contains_pii: true,
 			access: ['data-platform-engineers'],
-			status: 'awaiting_source_fix',
-			expires_at: '2026-11-02T00:00:00Z'
+			expires_at: '2026-11-02T00:00:00Z (30d; unresolved items escalate, not drop)'
 		}
 	},
 	bronze: {
@@ -124,15 +132,27 @@ export const metadataExamples: Record<string, MetadataExample> = {
 		}
 	},
 	semantic: {
-		title: 'Metric definition',
+		title: 'Metric definition (semantic layer)',
 		json: {
-			metric: 'active_customers',
+			metric: 'active_customers_30d',
+			version: 2,
 			owner: 'head-of-analytics',
-			definition: 'Customers with ≥1 customer-initiated transaction in trailing 30 days',
-			model: 'gold.dim_customer ⨝ gold.fct_daily_transactions',
+			definition:
+				'Customers with ≥1 customer-initiated transaction in trailing 30 days, excluding fees, interest and internal transfers, on an open account',
 			certified: true,
+			lineage: {
+				models: ['gold.dim_customer', 'gold.fct_daily_transactions'],
+				source_columns: ['silver.customer_transactions.txn_type', 'silver.customer.account_status']
+			},
+			dimensions: [
+				{ name: 'product', tag: 'internal', ai_allowed: true },
+				{ name: 'region', tag: 'internal', ai_allowed: true },
+				{ name: 'postcode', tag: 'pii_indirect', ai_allowed: false },
+				{ name: 'customer_key', tag: 'pseudonymous', ai_allowed: false }
+			],
 			exposed_to: ['Power BI', 'MCP'],
-			ai_policy: { aggregates_only: true, min_group_size: 10, pii_dimensions_blocked: ['postcode', 'dob'] }
+			ai_policy: { aggregates_only: true, min_group_size: 10 },
+			deprecates: { metric: 'active_customers_30d@v1', retiring_on: '2026-12-31' }
 		}
 	},
 	apis: {
@@ -141,10 +161,13 @@ export const metadataExamples: Record<string, MetadataExample> = {
 			event: 'mcp.tool_call',
 			tool: 'get_metric',
 			arguments: { metric: 'active_customers', group_by: 'product', period: '2026-09' },
-			caller: { user: 'analyst@thinkmoney (SSO)', client: 'Claude', session: 's_41b7' },
+			caller: { user: 'analyst@thinkmoney (SSO)', role: 'analytics-team', client: 'Claude', session: 's_41b7' },
+			purpose: 'Monthly product performance pack (prompt summary, personal data redacted)',
+			metric_version: 'active_customers_30d@v2',
+			rls_applied: 'analytics-team: all products, no customer-level rows',
 			rows_returned: 6,
 			pii_returned: false,
-			policy_checks: ['aggregates_only: pass', 'min_group_size: pass'],
+			policy_checks: ['aggregates_only: pass', 'min_group_size: pass', 'pii_dimensions: none requested'],
 			timestamp: '2026-10-03T16:04:12Z',
 			retention: '1 year, personal identifiers redacted'
 		}

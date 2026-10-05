@@ -1,16 +1,21 @@
 import {
+	sourcesQuestions,
 	ingestionQuestions,
 	validationQuestions,
 	bronzeQuestions,
 	silverQuestions,
-	goldQuestions
+	goldQuestions,
+	semanticQuestions,
+	consumersQuestions
 } from './questions.ts';
 
 export type StageStatus = 'keep' | 'rebuild' | 'new';
 
 export interface InterviewQuestion {
 	q: string;
-	a?: string; // TODO: model answers
+	a?: string; // model answer (supports **bold** and lists)
+	keyPoints?: string[]; // 3–5 recall cues shown before the full answer
+	progressiveReveal?: boolean; // default true; false skips the key-points stage
 }
 
 export interface Stage {
@@ -55,10 +60,7 @@ const baseStages: Omit<Stage, 'governance'>[] = [
 			'Undocumented upstream schema changes silently breaking pipelines',
 			'Card PAN data leaking into analytics sources (PCI-DSS scope creep)'
 		],
-		questions: [
-			{ q: 'How would you audit the existing sources in your first 30 days?' },
-			{ q: 'How do you agree data contracts with upstream product teams?' }
-		],
+		questions: sourcesQuestions,
 		oneLiner: 'Know every source, its owner and its sensitivity before you move a single row.'
 	},
 	{
@@ -203,10 +205,7 @@ const baseStages: Omit<Stage, 'governance'>[] = [
 			'Giving an LLM raw SQL access to card or PII data',
 			'No audit trail of what the AI queried — an FCA problem'
 		],
-		questions: [
-			{ q: 'How would you safely expose data to Claude via MCP in an FCA-regulated firm?' },
-			{ q: 'What is a semantic layer and why does thinkmoney need one now?' }
-		],
+		questions: semanticQuestions,
 		oneLiner: 'Define the metric once; let humans and AI ask the same question and get the same answer.'
 	},
 	{
@@ -230,10 +229,7 @@ const baseStages: Omit<Stage, 'governance'>[] = [
 			'Consumers bypassing layers and querying sources directly',
 			'Shipping dashboards nobody uses'
 		],
-		questions: [
-			{ q: 'How do you measure the value the data platform delivers?' },
-			{ q: 'How would your team use Claude Code day-to-day?' }
-		],
+		questions: consumersQuestions,
 		oneLiner: 'If no one consumes it, it isn’t a data product — it’s a cost.'
 	}
 ];
