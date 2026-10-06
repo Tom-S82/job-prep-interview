@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount, untrack } from 'svelte';
 	import { page } from '$app/state';
-	import { scenarios } from '#lib/data/scenarios.ts';
+	import { findScenario, scenarios } from '#lib/data/scenarios.ts';
 	import { analyseSpeech, type SpeechFeedback } from '#lib/speech/analysis.ts';
 	import type { RecorderResult } from '#lib/speech/capture.ts';
 	import { saveRecording } from '#lib/speech/recordings.ts';
@@ -12,7 +12,7 @@
 	import SpeechFeedbackView from '#lib/components/speak/SpeechFeedbackView.svelte';
 
 	const scenarioId = $derived(page.url.searchParams.get('s'));
-	const scenario = $derived(scenarios.find((s) => s.id === scenarioId) ?? null);
+	const scenario = $derived(findScenario(scenarioId) ?? null);
 
 	let ready = $state(false);
 	let result = $state<{ feedback: SpeechFeedback; audioUrl: string | null; typed: boolean; durationMs: number } | null>(null);

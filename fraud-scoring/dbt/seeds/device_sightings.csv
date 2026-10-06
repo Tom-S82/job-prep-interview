@@ -1,0 +1,5 @@
+customer_id,device_id,location,seen_at
+CUST_501,web-501,Manchester,2026-10-03 09:12:00
+CUST_502,dev-b7,Leeds,2026-10-01 14:05:00
+CUST_503,dev-old-12,Salford,2026-07-28 16:20:00
+CUST_504,dev-c3,Stockport,2026-09-30 19:00:00

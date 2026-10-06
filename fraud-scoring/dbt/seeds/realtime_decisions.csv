@@ -1,0 +1,5 @@
+application_id,customer_id,decision,score,ruleset_version,decided_at,fallback_reason
+APP_10001,CUST_501,approve,0.4,2026.10-v1,2026-10-06 10:00:00,
+APP_10002,CUST_502,decline,1.0,2026.10-v1,2026-10-06 10:00:00,
+APP_10003,CUST_503,manual_review,0.55,2026.10-v1,2026-10-06 10:00:00,
+APP_10004,CUST_504,approve,0.0,2026.10-v1,2026-10-06 10:00:00,

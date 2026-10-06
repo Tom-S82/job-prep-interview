@@ -1,0 +1,8 @@
+application_id,customer_id,applied_at,amount,stated_monthly_income,device_id,device_location,sca_result
+APP_09001,CUST_502,2026-10-03 10:00:00,500,2200,dev-b7,Leeds,passed
+APP_09002,CUST_502,2026-10-04 10:00:00,750,2200,dev-b7,Leeds,passed
+APP_09003,CUST_502,2026-10-05 10:00:00,1000,2200,dev-b7,Leeds,passed
+APP_10001,CUST_501,2026-10-06 10:00:00,250,1400,dev-a1,Manchester,passed
+APP_10002,CUST_502,2026-10-06 10:00:00,1500,2200,dev-zz9,Birmingham,failed
+APP_10003,CUST_503,2026-10-06 10:00:00,800,2600,dev-new-44,Salford,passed
+APP_10004,CUST_504,2026-10-06 10:00:00,400,1600,dev-c3,Stockport,passed

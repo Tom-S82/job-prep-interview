@@ -10,6 +10,7 @@ import { slowDashboards } from './scenarios/slow-dashboards.ts';
 import { gdprErasure } from './scenarios/gdpr-erasure.ts';
 import { clickstream } from './scenarios/clickstream.ts';
 import { apiFreshness } from './scenarios/api-freshness.ts';
+import { capstone } from './capstone/index.ts';
 
 export type OptionVerdict = 'best' | 'ok' | 'weak';
 
@@ -66,6 +67,7 @@ export interface ArchitectureScenario extends Articulation {
 	summary: string; // one line for the picker
 	context: string; // markdown
 	businessContext: string; // why it matters
+	primer?: string; // markdown: what you need to know before answering (teaching, optional)
 	level1Prompt: string;
 	level1Hints: string[];
 	level1Expert: string; // markdown: the full design
@@ -88,3 +90,10 @@ export const scenarios: ArchitectureScenario[] = [
 	clickstream,
 	apiFreshness
 ];
+
+/** Every challenge, including the capstone's parts (for lookups by id). */
+export const allScenarios: ArchitectureScenario[] = [...scenarios, ...capstone.parts];
+
+export const findScenario = (id: string | null | undefined) => allScenarios.find((s) => s.id === id);
+
+export { capstone };

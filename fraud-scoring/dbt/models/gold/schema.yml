@@ -1,0 +1,57 @@
+version: 2
+
+models:
+  - name: decisions
+    description: >
+      One row per application, re-scored in batch with the same behavioural rules as the
+      real-time Lambda, using features computed as at the application time.
+    columns:
+      - name: application_id
+        description: Exactly one decision per application (unique + completeness test).
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: source('silver', 'applications')
+                field: application_id
+      - name: customer_id
+        tests: [not_null]
+      - name: decision
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['approve', 'manual_review', 'decline']
+      - name: score
+        description: Sum of fired rule weights, capped at 1.0 (see tests/assert_score_between_0_and_1.sql).
+        tests: [not_null]
+      - name: confidence
+        description: Share of the 7 rules that had the data they needed.
+        tests: [not_null]
+      - name: ruleset_version
+        tests: [not_null]
+
+  - name: decision_reconciliation
+    description: Real-time (Lambda) decisions compared with the batch re-score.
+    columns:
+      - name: application_id
+        tests: [unique, not_null]
+      - name: decisions_match
+        tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+
+  - name: decision_summary
+    description: Daily decision counts, rates, scores and manual-review outcomes.
+    columns:
+      - name: decision_date
+        tests: [unique, not_null]
+
+  - name: customer_features
+    description: Feature-store snapshot exported to DynamoDB for the real-time Lambda.
+    columns:
+      - name: customer_id
+        tests: [unique, not_null]

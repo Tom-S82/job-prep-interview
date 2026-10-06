@@ -1,0 +1,71 @@
+version: 2
+
+sources:
+  - name: silver
+    description: Conformed Silver tables, merged hourly from SSIS CDC and the decision stream.
+    schema: silver
+    tables:
+      - name: applications
+        description: One row per card application (from core banking CDC).
+        loaded_at_field: applied_at
+        freshness: # CDC is hourly: warn if a run was missed, error if several were
+          warn_after: { count: 2, period: hour }
+          error_after: { count: 6, period: hour }
+        columns:
+          - name: application_id
+            tests: [unique, not_null]
+          - name: customer_id
+            tests: [not_null]
+          - name: applied_at
+          - name: amount
+          - name: stated_monthly_income
+          - name: device_id
+          - name: device_location
+          - name: sca_result
+            tests:
+              - accepted_values:
+                  arguments:
+                    values: ['passed', 'failed', 'not_attempted']
+
+      - name: customers
+        description: One row per customer; account opening date.
+        columns:
+          - name: customer_id
+            tests: [unique, not_null]
+          - name: account_opened_at
+
+      - name: transactions
+        description: Account transactions; direction is 'credit' or 'debit'.
+        columns:
+          - name: customer_id
+          - name: txn_at
+          - name: amount
+          - name: direction
+
+      - name: device_sightings
+        description: Every device and coarse location seen for a customer (logins, sessions, applications).
+        columns:
+          - name: customer_id
+          - name: device_id
+          - name: location
+          - name: seen_at
+
+      - name: realtime_decisions
+        description: Decisions made by the scoring Lambda, landed from Kinesis via Firehose and Bronze.
+        columns:
+          - name: application_id
+            tests: [unique, not_null]
+          - name: decision
+          - name: score
+          - name: ruleset_version
+          - name: decided_at
+          - name: fallback_reason
+            description: Set when the Lambda could not read features and failed safe.
+
+      - name: manual_reviews
+        description: Outcomes of manual reviews by the fraud operations team.
+        columns:
+          - name: application_id
+          - name: outcome
+          - name: opened_at
+          - name: resolved_at

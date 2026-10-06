@@ -1,0 +1,98 @@
+{
+	"_comment": "Example applications with the feature-store item each customer would have. 'now' is the server time the application arrives. Run: python examples/run_examples.py",
+	"now": "2026-10-06T10:00:00+00:00",
+	"scenarios": [
+		{
+			"name": "1. New customer, low risk",
+			"expected": "approve",
+			"why": "Account opened on the web 3 days ago, now applying from a new phone: normal for a first application, and nothing else is unusual.",
+			"request": {
+				"application_id": "APP_10001",
+				"customer_id": "CUST_501",
+				"amount": 250,
+				"stated_monthly_income": 1400,
+				"device_id": "dev-a1",
+				"device_location": "Manchester",
+				"sca_result": "passed"
+			},
+			"features": {
+				"customer_id": "CUST_501",
+				"account_opened_at": "2026-10-03T09:12:00+00:00",
+				"last_activity_at": "2026-10-05T18:40:00+00:00",
+				"typical_monthly_income": null,
+				"known_devices": ["web-501"],
+				"usual_locations": ["Manchester"],
+				"recent_application_ts": []
+			}
+		},
+		{
+			"name": "2. High velocity, new device",
+			"expected": "decline",
+			"why": "Three applications in a week from a new account, on a device and in a location never seen before, with SCA failing.",
+			"request": {
+				"application_id": "APP_10002",
+				"customer_id": "CUST_502",
+				"amount": 1500,
+				"stated_monthly_income": 2200,
+				"device_id": "dev-zz9",
+				"device_location": "Birmingham",
+				"sca_result": "failed"
+			},
+			"features": {
+				"customer_id": "CUST_502",
+				"account_opened_at": "2026-10-01T14:00:00+00:00",
+				"last_activity_at": "2026-10-05T23:10:00+00:00",
+				"typical_monthly_income": null,
+				"known_devices": ["dev-b7"],
+				"usual_locations": ["Leeds"],
+				"recent_application_ts": [1791021600, 1791108000, 1791194400]
+			}
+		},
+		{
+			"name": "3. Dormant account reactivated",
+			"expected": "manual_review",
+			"why": "Long-standing account, quiet for 69 days, now applying from a new device with stated income well above what flows through the account.",
+			"request": {
+				"application_id": "APP_10003",
+				"customer_id": "CUST_503",
+				"amount": 800,
+				"stated_monthly_income": 2600,
+				"device_id": "dev-new-44",
+				"device_location": "Salford",
+				"sca_result": "passed"
+			},
+			"features": {
+				"customer_id": "CUST_503",
+				"account_opened_at": "2023-02-14T11:00:00+00:00",
+				"last_activity_at": "2026-07-28T16:20:00+00:00",
+				"typical_monthly_income": 1450,
+				"known_devices": ["dev-old-12"],
+				"usual_locations": ["Salford"],
+				"recent_application_ts": []
+			}
+		},
+		{
+			"name": "4. Established customer, everything familiar",
+			"expected": "approve",
+			"why": "Every rule has the data it needs and none fire: score 0, confidence 1.0.",
+			"request": {
+				"application_id": "APP_10004",
+				"customer_id": "CUST_504",
+				"amount": 400,
+				"stated_monthly_income": 1600,
+				"device_id": "dev-c3",
+				"device_location": "Stockport",
+				"sca_result": "passed"
+			},
+			"features": {
+				"customer_id": "CUST_504",
+				"account_opened_at": "2024-05-20T08:00:00+00:00",
+				"last_activity_at": "2026-10-05T12:00:00+00:00",
+				"typical_monthly_income": 1550,
+				"known_devices": ["dev-c3"],
+				"usual_locations": ["Stockport"],
+				"recent_application_ts": []
+			}
+		}
+	]
+}

@@ -1,0 +1,53 @@
+# Fraud scoring: batch re-scoring, reconciliation and analysis.
+# Target warehouse: Amazon Redshift (dbt-redshift). Runs unchanged on DuckDB for local
+# development and CI (see profiles.example.yml), because the models use dbt's
+# cross-database macros (dbt.dateadd, dbt.datediff, dbt.current_timestamp).
+
+name: fraud_scoring
+version: '1.0.0'
+config-version: 2
+profile: fraud_scoring
+
+model-paths: ['models']
+macro-paths: ['macros']
+seed-paths: ['seeds']
+test-paths: ['tests']
+clean-targets: ['target', 'dbt_packages']
+
+vars:
+  # --- Ruleset: MUST match lambda/scoring.py (a unit test fails if they drift) ---
+  ruleset_version: '2026.10-v1'
+  decline_above: 0.75
+  review_from: 0.50
+  weight_new_account: 0.25
+  weight_velocity_spike: 0.35
+  weight_device_new: 0.15
+  weight_income_consistency: 0.20
+  weight_dormant_reactivation: 0.20
+  weight_sca_fail: 0.30
+  weight_location_unusual: 0.10
+  new_account_days: 7
+  velocity_window_days: 7
+  velocity_max_prior_applications: 2
+  income_ratio_limit: 1.5
+  dormant_days: 30
+
+  # --- Feature definitions (shared with the feature-store export) ---
+  income_window_days: 90 # typical income = credits over this window, per month of history
+  income_min_history_days: 30 # below this, income consistency is "not evaluated"
+  location_window_days: 90
+
+  # --- Operations ---
+  lookback_days: 3 # incremental runs reprocess this many days for late-arriving CDC
+  reconciliation_tolerance: 0.05 # max share of real-time vs batch decision mismatches per day
+
+models:
+  fraud_scoring:
+    gold:
+      +schema: gold
+      +tags: ['fraud']
+
+seeds:
+  fraud_scoring:
+    # Sample Silver data for local runs and CI only; in production these are real Silver tables.
+    +schema: silver

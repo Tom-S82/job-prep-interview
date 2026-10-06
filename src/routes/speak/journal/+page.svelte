@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import { scenarios } from '#lib/data/scenarios.ts';
+	import { findScenario } from '#lib/data/scenarios.ts';
 	import { stars } from '#lib/speech/analysis.ts';
 	import { getRecording } from '#lib/speech/recordings.ts';
 	import { journal, journalStats, type JournalEntry } from '#lib/stores/speechJournal.ts';
@@ -12,7 +12,7 @@
 	onMount(() => (ready = true));
 	onDestroy(() => Object.values(audio).forEach((u) => URL.revokeObjectURL(u)));
 
-	const title = (id: string) => scenarios.find((s) => s.id === id)?.title ?? id;
+	const title = (id: string) => findScenario(id)?.title ?? id;
 	const recent = $derived($journal.entries.slice(-20));
 	const newestFirst = $derived([...$journal.entries].reverse());
 	const fmtDate = (iso: string) =>

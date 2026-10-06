@@ -1,0 +1,20 @@
+# Copy to ~/.dbt/profiles.yml (or pass --profiles-dir) and fill in the target you need.
+fraud_scoring:
+  target: local
+  outputs:
+    # Production / CI against Redshift. Credentials come from the environment, never from this file.
+    redshift:
+      type: redshift
+      host: "{{ env_var('REDSHIFT_HOST') }}"
+      port: 5439
+      dbname: analytics
+      user: "{{ env_var('REDSHIFT_USER') }}"
+      password: "{{ env_var('REDSHIFT_PASSWORD') }}"
+      schema: dbt
+      threads: 4
+
+    # Local development: the same models on DuckDB, with the sample seeds as Silver.
+    local:
+      type: duckdb
+      path: fraud_scoring.duckdb
+      threads: 4

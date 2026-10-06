@@ -2,31 +2,37 @@
 	import { onMount, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { scenarios } from '#lib/data/scenarios.ts';
+	import { capstone, findScenario, scenarios } from '#lib/data/scenarios.ts';
+	import type { CapstonePart } from '#lib/data/capstone/index.ts';
 	import { emptyAnswers, evaluateChallenge, type ChallengeAnswers } from '#lib/utils/challengeFeedback.ts';
-	import { challengeProgress, challengeSummary } from '#lib/stores/challengeProgress.ts';
+	import { challengeProgress, challengeSummary, capstoneSummary } from '#lib/stores/challengeProgress.ts';
 	import { attemptHistory, buildAttempt } from '#lib/stores/attemptHistory.ts';
 	import ArchitectureChallenge from '#lib/components/ArchitectureChallenge.svelte';
 	import ChallengeSubmission from '#lib/components/ChallengeSubmission.svelte';
 	import AttemptHistory from '#lib/components/AttemptHistory.svelte';
 	import AttemptDetail from '#lib/components/AttemptDetail.svelte';
 	import ProgressJournal from '#lib/components/ProgressJournal.svelte';
+	import CapstoneOverview from '#lib/components/capstone/CapstoneOverview.svelte';
+	import CapstoneHeader from '#lib/components/capstone/CapstoneHeader.svelte';
 
 	// URL is the source of truth, so a refresh lands you back where you were:
 	//   ?s=<id>                 design form
 	//   ?s=<id>&a=<attempt>     feedback for a saved attempt
 	//   ?view=history[&a=…]     attempt history / one attempt in detail
 	//   ?view=journal           progress journal
+	//   ?view=capstone          capstone overview (parts are ?s=<part id>)
 	const params = $derived(page.url.searchParams);
 	const scenarioId = $derived(params.get('s'));
 	const attemptId = $derived(params.get('a'));
 	const view = $derived(params.get('view'));
-	const scenario = $derived(scenarios.find((s) => s.id === scenarioId) ?? null);
+	const scenario = $derived(findScenario(scenarioId) ?? null);
+	const capstonePart = $derived(capstone.parts.find((p) => p.id === scenarioId) as CapstonePart | undefined);
 	const attempt = $derived(attemptId ? $attemptHistory.find((a) => a.id === attemptId) : undefined);
 	const nextHref = $derived.by(() => {
 		if (!scenario) return null;
-		const i = scenarios.indexOf(scenario);
-		return i < scenarios.length - 1 ? `?s=${scenarios[i + 1].id}` : null;
+		const list: { id: string }[] = capstonePart ? capstone.parts : scenarios;
+		const i = list.findIndex((x) => x.id === scenario.id);
+		return i >= 0 && i < list.length - 1 ? `?s=${list[i + 1].id}` : null;
 	});
 
 	let answers = $state<ChallengeAnswers>(emptyAnswers());
@@ -66,7 +72,8 @@
 	const tabs = [
 		{ id: null, href: '/challenge', label: 'Scenarios' },
 		{ id: 'history', href: '?view=history', label: 'Attempt History' },
-		{ id: 'journal', href: '?view=journal', label: 'Progress Journal' }
+		{ id: 'journal', href: '?view=journal', label: 'Progress Journal' },
+		{ id: 'capstone', href: '?view=capstone', label: 'Capstone' }
 	];
 </script>
 
@@ -93,6 +100,10 @@
 				{/if}
 			</div>
 		</header>
+
+		{#if capstonePart}
+			<CapstoneHeader part={capstonePart} />
+		{/if}
 
 		{#if scenario && attemptId}
 			<!-- Feedback for a saved attempt (survives refresh) -->
@@ -123,7 +134,7 @@
 			{#if view === 'history'}
 				{#if attemptId}
 					{#if attempt}
-						<AttemptDetail {attempt} scenario={scenarios.find((s) => s.id === attempt.scenarioId)} />
+						<AttemptDetail {attempt} scenario={findScenario(attempt.scenarioId)} />
 					{:else}
 						<p class="text-sm text-slate-400">That attempt isn't in your history. <a class="text-sky-400" href="?view=history">Back to history</a></p>
 					{/if}
@@ -132,6 +143,8 @@
 				{/if}
 			{:else if view === 'journal'}
 				<ProgressJournal />
+			{:else if view === 'capstone'}
+				<CapstoneOverview />
 			{:else}
 				<!-- What to expect -->
 				<details class="how-it-works mb-6 rounded-2xl border border-sky-900/60 bg-sky-950/20 p-5" open={!$challengeSummary.completed}>
@@ -224,6 +237,21 @@
 						</li>
 					{/each}
 				</ul>
+
+				<a
+					href="?view=capstone"
+					class="capstone-card mt-4 flex flex-col gap-3 rounded-2xl border border-amber-900/60 bg-amber-950/10 p-5 transition-colors hover:border-amber-400/60 sm:flex-row sm:items-center"
+				>
+					<span class="flex-1">
+						<span class="font-mono text-xs tracking-widest text-amber-400/80 uppercase">Capstone · 8 parts + synthesis</span>
+						<span class="mt-1 block text-lg font-semibold text-slate-100">{capstone.title.replace('Capstone: ', '')}</span>
+						<span class="mt-1 block text-sm text-slate-400">{capstone.summary}</span>
+					</span>
+					<span class="text-right">
+						<span class="block font-mono text-sm text-slate-300" data-testid="capstone-card-progress">{$capstoneSummary.completed}/{$capstoneSummary.total} parts</span>
+						<span class="mt-1 block text-sm text-amber-300">{$capstoneSummary.completed ? 'Continue →' : 'Start →'}</span>
+					</span>
+				</a>
 			{/if}
 		{/if}
 	</div>

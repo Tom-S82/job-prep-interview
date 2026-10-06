@@ -43,6 +43,16 @@
 		</p>
 	</section>
 
+	{#if scenario.primer}
+		<details class="primer rounded-2xl border border-emerald-900/60 bg-emerald-950/10 p-5 sm:p-6" open>
+			<summary class="cursor-pointer text-base font-semibold text-emerald-200">Before you answer: what you need to know</summary>
+			<div class="prose prose-sm prose-invert mt-3 max-w-none prose-p:text-slate-300 prose-strong:text-emerald-200 prose-li:text-slate-300 prose-code:text-sky-300">
+				{@html markdownToHtml(scenario.primer)}
+			</div>
+			<p class="mt-2 text-xs text-slate-500">Collapse this once you've read it; the feedback assumes these facts.</p>
+		</details>
+	{/if}
+
 	<!-- Level 1 -->
 	<section class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 sm:p-6">
 		<p class="font-mono text-xs tracking-widest text-slate-500 uppercase">Level 1 · High-level approach</p>
