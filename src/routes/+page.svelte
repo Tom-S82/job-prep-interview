@@ -10,6 +10,11 @@
 	<div class="mx-auto max-w-7xl">
 		<nav class="mb-4 flex flex-wrap justify-end gap-2">
 			<a
+				href="/decisioning-pipeline"
+				class="rounded-md border border-cyan-500/50 px-3 py-1.5 text-sm text-cyan-200 hover:border-cyan-400 hover:text-cyan-100"
+				>Track 2: Decisioning →</a
+			>
+			<a
 				href="/interview"
 				class="rounded-md border border-amber-500/50 px-3 py-1.5 text-sm text-amber-200 hover:border-amber-400 hover:text-amber-100"
 				>Interview Mode →</a
