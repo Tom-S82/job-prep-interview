@@ -454,6 +454,27 @@ export const decisionStages: DecisionStage[] = [
 		latency: '~8 ms'
 	},
 	{
+		id: 'rules-config',
+		label: 'Fraud Rules Config',
+		sub: 'dbt model · versioned',
+		color: '#2dd4bf',
+		oneLiner:
+			'Rules are data, not code: versioned, reviewed, tested, and shared by real-time and batch.',
+		what: [
+			'Weights and thresholds live in one dbt model (fraud_rules), version-controlled in git',
+			'A change is a pull request: reviewed by FinCrime, back-tested against gold.decisions in CI, then tagged (e.g. 2026.10-v1)',
+			'The release publishes the ruleset as a config artefact; the Lambda loads it at cold start alongside the Feature Store read',
+			'The batch re-score reads the same model, so real-time and batch can never silently drift apart'
+		],
+		why: 'Fraud teams tune rules far more often than engineers change code. Making rules a governed dbt model gives an audit trail (who changed which weight, when, why) without redeploying the scorer.',
+		risk: [
+			'A bad weight goes live everywhere at once: require a back-test diff in the PR and a named FinCrime approver',
+			'Lambda caching an old ruleset after release: every decision records ruleset_version, and reconciliation flags mismatches',
+			'Today the weights are also in scoring.py; a test fails if the two differ. Next step is one source of truth.'
+		],
+		latency: 'cold start'
+	},
+	{
 		id: 'decision',
 		label: 'Decision',
 		sub: 'Approve · Review · Decline',

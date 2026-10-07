@@ -37,11 +37,13 @@ test('page renders seven stages and auto-plays the default scenario', async ({ p
 	page.on('pageerror', (e) => errors.push(e.message));
 
 	await page.goto(URL);
-	await expect(page.locator('g.stage')).toHaveCount(7);
+	await expect(page.locator('g.stage')).toHaveCount(8);
 	for (const t of [
 		'Application',
 		'Lambda Scorer',
 		'Feature Store',
+		'Fraud Rules Config',
+		'sync decision (< 200ms)',
 		'Decision',
 		'Kinesis',
 		'Bronze',
@@ -54,7 +56,7 @@ test('page renders seven stages and auto-plays the default scenario', async ({ p
 	await expect(page.locator('[data-testid="decision-badge"]')).toHaveAttribute(
 		'data-score',
 		'0.40',
-		{ timeout: 10_000 }
+		{ timeout: 20_000 }
 	);
 	expect(errors).toEqual([]);
 });
@@ -77,7 +79,7 @@ for (const s of EXPECTED) {
 		await page.selectOption('[data-testid="scenario-select"]', s.value);
 
 		const score = page.locator('[data-testid="running-score"]');
-		await expect(score).toHaveAttribute('data-done', 'true', { timeout: 10_000 });
+		await expect(score).toHaveAttribute('data-done', 'true', { timeout: 20_000 });
 		await expect(score).toHaveText(s.score);
 
 		// Each rule shows its contribution only if it fired
@@ -101,7 +103,7 @@ for (const s of EXPECTED) {
 		}
 
 		const badge = page.locator('[data-testid="decision-badge"]');
-		await expect(badge).toHaveAttribute('data-decision', s.decision, { timeout: 10_000 });
+		await expect(badge).toHaveAttribute('data-decision', s.decision, { timeout: 20_000 });
 		await expect(badge).toHaveAttribute('data-score', s.score);
 
 		// Detail table agrees with the animation
@@ -126,6 +128,7 @@ test('clickable stages expand and collapse', async ({ page }) => {
 		'application',
 		'lambda',
 		'features',
+		'rules-config',
 		'decision',
 		'kinesis',
 		'bronze',
@@ -201,7 +204,7 @@ test('pause freezes the floor', async ({ page }) => {
 test('lays out at phone width without page overflow', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto(URL);
-	await expect(page.locator('g.stage')).toHaveCount(7);
+	await expect(page.locator('g.stage')).toHaveCount(8);
 	const overflow = await page.evaluate(
 		() => document.documentElement.scrollWidth - window.innerWidth
 	);

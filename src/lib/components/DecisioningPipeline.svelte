@@ -17,7 +17,7 @@
 
 	// --- Layout constants (SVG user units; the SVG scales via viewBox) ---
 	const W = 1200;
-	const H = 350;
+	const H = 372;
 	const MARGIN = 24;
 	const GAP = 16;
 	const BOX_TOP = 44;
@@ -30,10 +30,11 @@
 	const APPLICATION = 0;
 	const LAMBDA = 1;
 	const FEATURES = 2;
-	const DECISION = 3;
-	const KINESIS = 4;
-	const BRONZE = 5;
-	const SILVER_GOLD = 6;
+	const RULES_CONFIG = 3;
+	const DECISION = 4;
+	const KINESIS = 5;
+	const BRONZE = 6;
+	const SILVER_GOLD = 7;
 	const N = decisionStages.length;
 
 	// Timings in frames (1 frame = 16.67 ms at 1×)
@@ -102,6 +103,8 @@
 	const kx = $derived(centre(KINESIS));
 	const fx = $derived(centre(FEATURES));
 	const lx = $derived(centre(LAMBDA));
+	const ax = $derived(centre(APPLICATION));
+	const rx = $derived(centre(RULES_CONFIG));
 
 	function toggle(i: number) {
 		selectedIndex = selectedIndex === i ? null : i;
@@ -391,6 +394,21 @@
 						recent_application_ts: [...s.features.recent_application_ts, NOW.getTime() / 1000]
 					}
 				};
+			case 'rules-config':
+				return {
+					title: 'dbt: models/config/fraud_rules.sql (released as ruleset JSON)',
+					body: {
+						ruleset_version: RULESET_VERSION,
+						thresholds: { review_from: REVIEW_FROM, decline_above: DECLINE_ABOVE },
+						rules: RULES.map((r) => ({
+							factor: r.id,
+							weight: r.weight,
+							description: r.description
+						})),
+						approved_by: 'FinCrime lead',
+						backtest: 'gold.decisions, last 90 days'
+					}
+				};
 			case 'kinesis':
 				return {
 					title: 'kinesis.put_record',
@@ -551,6 +569,28 @@
 					orient="auto-start-reverse"
 				>
 					<path d="M0,0 L10,5 L0,10 z" fill="#a78bfa" />
+				</marker>
+				<marker
+					id="arrow-cyan"
+					viewBox="0 0 10 10"
+					refX="8"
+					refY="5"
+					markerWidth="6"
+					markerHeight="6"
+					orient="auto-start-reverse"
+				>
+					<path d="M0,0 L10,5 L0,10 z" fill="#22d3ee" />
+				</marker>
+				<marker
+					id="arrow-teal"
+					viewBox="0 0 10 10"
+					refX="8"
+					refY="5"
+					markerWidth="6"
+					markerHeight="6"
+					orient="auto-start-reverse"
+				>
+					<path d="M0,0 L10,5 L0,10 z" fill="#2dd4bf" />
 				</marker>
 			</defs>
 			<rect width={W} height={H} fill="url(#dgrid)" />
@@ -761,6 +801,15 @@
 								>
 							{/if}
 							<text x={tx} y={BOX_BOTTOM - 12} fill="#64748b" font-size="8.5">nightly ← dbt</text>
+						{:else if i === RULES_CONFIG}
+							<text x={tx} y={INNER_Y} fill="#5eead4">dbt: fraud_rules</text>
+							<text x={tx} y={INNER_Y + 15} fill="#94a3b8">{RULESET_VERSION}</text>
+							<text x={tx} y={INNER_Y + 30} fill="#94a3b8">{RULES.length} rules · weights</text>
+							<text x={tx} y={INNER_Y + 45} fill="#94a3b8">thresholds .50/.75</text>
+							<text x={tx} y={INNER_Y + 68} fill="#4ade80">✓ CI tested</text>
+							<text x={tx} y={BOX_BOTTOM - 12} fill="#64748b" font-size="8.5"
+								>git tag → release</text
+							>
 						{:else if i === DECISION}
 							{#if decisionSc !== null}
 								{@const ds = fraudScenarios[decisionSc]}
@@ -831,6 +880,26 @@
 				</g>
 			{/each}
 
+			<!-- Sync response: Lambda → Application (over the top) -->
+			<path
+				d="M{lx},{BOX_TOP} Q{(lx + ax) / 2},{BOX_TOP - 34} {ax},{BOX_TOP - 2}"
+				fill="none"
+				stroke="#22d3ee"
+				stroke-width="1.5"
+				stroke-dasharray="5 4"
+				stroke-dashoffset={-flowT * 2}
+				marker-end="url(#arrow-cyan)"
+				data-testid="sync-arrow"
+			/>
+			<text
+				x={(lx + ax) / 2}
+				y={BOX_TOP - 22}
+				text-anchor="middle"
+				fill="#67e8f9"
+				font-size="9.5"
+				font-family="ui-monospace, monospace">sync decision (&lt; 200ms)</text
+			>
+
 			<!-- Async publish: Decision → Kinesis (over the top) -->
 			<path
 				d="M{dx},{BOX_TOP} Q{(dx + kx) / 2},{BOX_TOP - 34} {kx},{BOX_TOP - 2}"
@@ -852,7 +921,7 @@
 
 			<!-- Feature read: Feature Store → Lambda (underneath), happens before scoring -->
 			<path
-				d="M{fx},{BOX_BOTTOM} Q{(fx + lx) / 2},{BOX_BOTTOM + 44} {lx},{BOX_BOTTOM + 2}"
+				d="M{fx},{BOX_BOTTOM} Q{(fx + lx) / 2},{BOX_BOTTOM + 40} {lx + 10},{BOX_BOTTOM + 2}"
 				fill="none"
 				stroke="#a78bfa"
 				stroke-width="1.5"
@@ -861,12 +930,35 @@
 				marker-end="url(#arrow-violet)"
 			/>
 			<text
-				x={(fx + lx) / 2}
-				y={BOX_BOTTOM + 40}
+				x={(fx + lx) / 2 + 40}
+				y={BOX_BOTTOM + 15}
 				text-anchor="middle"
 				fill="#c4b5fd"
 				font-size="9.5"
-				font-family="ui-monospace, monospace">GetItem ~8 ms (read before scoring)</text
+				stroke="#020617"
+				stroke-width="4"
+				paint-order="stroke"
+				font-family="ui-monospace, monospace">GetItem ~8 ms · before scoring</text
+			>
+
+			<!-- Rules config: versioned dbt model → Lambda (loaded at cold start, alongside features) -->
+			<path
+				d="M{rx},{BOX_BOTTOM} Q{(rx + lx) / 2},{BOX_BOTTOM + 104} {lx - 10},{BOX_BOTTOM + 2}"
+				fill="none"
+				stroke="#2dd4bf"
+				stroke-width="1.5"
+				stroke-dasharray="5 4"
+				stroke-dashoffset={flowT * 2}
+				marker-end="url(#arrow-teal)"
+			/>
+			<text
+				x={(rx + lx) / 2}
+				y={BOX_BOTTOM + 70}
+				text-anchor="middle"
+				fill="#5eead4"
+				font-size="9.5"
+				font-family="ui-monospace, monospace"
+				>rules + weights loaded at cold start ({RULESET_VERSION})</text
 			>
 
 			<g bind:this={ptLayer}></g>
